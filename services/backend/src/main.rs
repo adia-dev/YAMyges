@@ -12,10 +12,17 @@ async fn main() {
 
     let password: String = std::env::var("KORDIS_PASSWORD").expect("KORDIS_PASSWORD must be set.");
 
-    let authentication_token: KordisToken = match kordis::authenticate(&username, &password).await {
+    let token: KordisToken = match kordis::authenticate(&username, &password).await {
         Ok(token) => token,
         Err(error) => panic!("Could not authenticate {}, reason: {:?}", username, error),
     };
 
-    println!("{:#?}", authentication_token);
+    println!("{:#?}", token);
+
+    let agenda = token.get_agenda()
+        .await
+        .unwrap();
+
+    println!("{:#?}", agenda);
+
 }

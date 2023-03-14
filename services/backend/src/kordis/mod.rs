@@ -3,6 +3,24 @@ use regex::Regex;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+// use lazy_static::lazy_static;
+
+// This is the only way I have found to create a static vector of strings
+// I am looking for a way to store the endpoints in the binary file of the application :/
+// TODO: come back to this later once a solution has been found
+// lazy_static! {
+//     pub static ref API_ENDPOINTS: Vec<&'static str> = vec![
+//         "/profile",
+//         "/agenda",
+//         "/news",
+//         "/news/banners",
+//         "/:year/grades",
+//         "/:year/absences",
+//         "/:year/classes",
+//         "/classes/:classId/students",
+//         "/students/:studentId"
+//     ];
+// }
 
 // I've set the other fields as optional, I may use the expiration later but for now I don't have
 // any use case for it
@@ -26,6 +44,45 @@ impl KordisToken {
             kind,
             expiration,
             scope,
+        }
+    }
+
+    // TODO: extremely unsafe, take care of all of the unwraps
+    pub async fn get_agenda(self: &Self) -> Result<serde_json::Value, &'static str> {
+        match get_kordis_api_url("agenda", Some(true)) {
+            Some(url) => {
+                let client: Client = reqwest::ClientBuilder::new().build().unwrap();
+                let authorization_header: String = format!("bearer {}", self.token);
+                
+                let mut request_headers: header::HeaderMap = header::HeaderMap::new();
+                request_headers.insert(
+                    reqwest::header::AUTHORIZATION,
+                    authorization_header.parse().unwrap(),
+                );
+
+                println!("{:#?}", request_headers);
+                // TODO: take a week number, convert it to EPOCH time
+                let params = [
+                    ("start", "1678056275462"),
+                    ("end", "1679265052467")
+                ];
+
+                let parsed_url = reqwest::Url::parse_with_params(&url, params).unwrap();
+
+                // FIXME: handle this response better, especially the unwrap
+                let response = client
+                    .get(parsed_url)
+                    .headers(request_headers)
+                    .send()
+                    .await
+                    .unwrap()
+                    .json::<serde_json::Value>()
+                    .await
+                    .unwrap();
+
+                Ok(response)
+            }, 
+                _ => Err("Could not get the agenda endpoint")
         }
     }
 
@@ -133,4 +190,54 @@ pub async fn authenticate(username: &str, password: &str) -> Result<KordisToken,
 // |> general_purpose::STANDARD_NO_PAD.encode()
 fn encoded_credentials(username: &str, password: &str) -> String {
     general_purpose::STANDARD_NO_PAD.encode(format!("{}:{}", username, password))
+}
+
+fn get_endpoint(name: &str) -> Option<&'static str> {
+    match name {
+        "profile" => Some("/profile"),
+        "agenda" => Some("/agenda"),
+        "news" => Some("/news"),
+        "banners" => Some("/news/banners"),
+        "grades" => Some("/:year/grades"),
+        "absences" => Some("/:year/absences"),
+        "classes" => Some("/:year/classes"),
+        "students" => Some("/classes/:classId/students"),
+        "student" => Some("/students/:studentId"),
+        _ => None,
+    }
+}
+
+// the kordis API has some endpoints that have that `/me` prefix to it :p
+// example:
+// http://thrustworthy-api.com/endpoint -> http://thrustworthy-api.com/me/endpoint
+fn get_my_endpoint(name: &str) -> Option<String> {
+    match get_endpoint(name) {
+        Some(endpoint) => Some(format!("/me{}", endpoint)),
+        _ => None,
+    }
+}
+
+fn get_kordis_base_url() -> String {
+    std::env::var("KORDIS_BASE_URL").expect("KORDIS_BASE_URL must be set.")
+}
+
+// FIXME: ugly code repetition, I need to find how to make an `optional` without Option
+fn get_kordis_api_url(endpoint: &str, me: Option<bool>) -> Option<String> {
+
+    let endpoint: Option<String> = match me {
+        Some(true) => get_my_endpoint(endpoint),
+        _ => {
+            // I had to wrap the get_endpoint method in a match to convert it to a String
+            // The previous match had mismatch arms types: String != &'static str
+            match get_endpoint(endpoint) {
+                Some(s_endpoint) => Some(s_endpoint.to_string()),
+                _ => None
+            }
+        }
+    };
+
+   match endpoint {
+        Some(endpoint) => Some(format!("{}{}", get_kordis_base_url(), endpoint)),
+        _ => None
+    } 
 }
