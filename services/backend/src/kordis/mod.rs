@@ -4,7 +4,6 @@ use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-
 // I've set the other fields as optional, I may use the expiration later but for now I don't have
 // any use case for it
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -96,15 +95,13 @@ impl KordisToken {
 }
 
 pub async fn authenticate(username: &str, password: &str) -> Result<KordisToken, &'static str> {
-
-    let kordis_auth_url: String = std::env::var("KORDIS_AUTH_URL").expect("The KORDIS_AUTH_URL must be set.");
+    let kordis_auth_url: String =
+        std::env::var("KORDIS_AUTH_URL").expect("The KORDIS_AUTH_URL must be set.");
     let authorization_header = format!("Basic {}", encoded_credentials(username, password));
 
     // I could have used the reqwest::get() method directly but I may have to customize some
     // headers later on :/
-    let client: Client = reqwest::Client::builder()
-        .build()
-        .unwrap();
+    let client: Client = reqwest::Client::builder().build().unwrap();
 
     let mut request_headers: header::HeaderMap = header::HeaderMap::new();
     request_headers.insert(
@@ -113,7 +110,8 @@ pub async fn authenticate(username: &str, password: &str) -> Result<KordisToken,
     );
 
     // FIXME: handle this response better, especially the unwrap
-    let response_headers = client.get(kordis_auth_url)
+    let response_headers = client
+        .get(kordis_auth_url)
         .headers(request_headers)
         .send()
         .await
