@@ -53,7 +53,7 @@ impl KordisToken {
             Some(url) => {
                 let client: Client = reqwest::ClientBuilder::new().build().unwrap();
                 let authorization_header: String = format!("bearer {}", self.token);
-                
+
                 let mut request_headers: header::HeaderMap = header::HeaderMap::new();
                 request_headers.insert(
                     reqwest::header::AUTHORIZATION,
@@ -62,10 +62,7 @@ impl KordisToken {
 
                 println!("{:#?}", request_headers);
                 // TODO: take a week number, convert it to EPOCH time
-                let params = [
-                    ("start", "1678056275462"),
-                    ("end", "1679265052467")
-                ];
+                let params = [("start", "1678056275462"), ("end", "1679265052467")];
 
                 let parsed_url = reqwest::Url::parse_with_params(&url, params).unwrap();
 
@@ -81,8 +78,8 @@ impl KordisToken {
                     .unwrap();
 
                 Ok(response)
-            }, 
-                _ => Err("Could not get the agenda endpoint")
+            }
+            _ => Err("Could not get the agenda endpoint"),
         }
     }
 
@@ -223,7 +220,6 @@ fn get_kordis_base_url() -> String {
 
 // FIXME: ugly code repetition, I need to find how to make an `optional` without Option
 fn get_kordis_api_url(endpoint: &str, me: Option<bool>) -> Option<String> {
-
     let endpoint: Option<String> = match me {
         Some(true) => get_my_endpoint(endpoint),
         _ => {
@@ -231,13 +227,13 @@ fn get_kordis_api_url(endpoint: &str, me: Option<bool>) -> Option<String> {
             // The previous match had mismatch arms types: String != &'static str
             match get_endpoint(endpoint) {
                 Some(s_endpoint) => Some(s_endpoint.to_string()),
-                _ => None
+                _ => None,
             }
         }
     };
 
-   match endpoint {
+    match endpoint {
         Some(endpoint) => Some(format!("{}{}", get_kordis_base_url(), endpoint)),
-        _ => None
-    } 
+        _ => None,
+    }
 }

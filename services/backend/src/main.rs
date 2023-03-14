@@ -19,10 +19,7 @@ async fn main() {
 
     println!("{:#?}", token);
 
-    let agenda = token.get_agenda()
-        .await
-        .unwrap();
+    let agenda = token.get_agenda().await.unwrap();
 
     println!("{:#?}", agenda);
-
 }
