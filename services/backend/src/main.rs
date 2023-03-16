@@ -7,6 +7,9 @@ use dotenv::dotenv;
 use kordis::KordisToken;
 
 // TODO: add a CLI to allow the user to login using -u, --username, -p, --password
+// --start YYYY-MM-DD
+// --end YYYY-MM-DD
+// -w +|- <number> to move in the calendar on a week basis
 #[tokio::main]
 async fn main() {
     dotenv().ok();

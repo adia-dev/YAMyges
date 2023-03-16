@@ -241,3 +241,12 @@ fn get_kordis_api_url(endpoint: &str, me: Option<bool>) -> Option<String> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn whats_nine_plus_ten() {
+        let result = 9 + 10;
+        assert_ne!(result, 21); // you stupid !
+    }
+}
