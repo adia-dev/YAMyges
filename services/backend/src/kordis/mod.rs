@@ -48,7 +48,11 @@ impl KordisToken {
     }
 
     // TODO: extremely unsafe, take care of all of the unwraps
-    pub async fn get_agenda(self: &Self) -> Result<serde_json::Value, &'static str> {
+    pub async fn get_agenda(
+        self: &Self,
+        start: i64,
+        end: i64,
+    ) -> Result<serde_json::Value, &'static str> {
         match get_kordis_api_url("agenda", Some(true)) {
             Some(url) => {
                 let client: Client = reqwest::ClientBuilder::new().build().unwrap();
@@ -62,7 +66,7 @@ impl KordisToken {
 
                 println!("{:#?}", request_headers);
                 // TODO: take a week number, convert it to EPOCH time
-                let params = [("start", "1678056275462"), ("end", "1679265052467")];
+                let params = [("start", start.to_string()), ("end", end.to_string())];
 
                 let parsed_url = reqwest::Url::parse_with_params(&url, params).unwrap();
 
