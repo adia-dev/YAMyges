@@ -1,20 +1,43 @@
+#![allow(unused)]
+
+mod cli;
 mod kordis;
 
-use std::env;
+use clap::Parser;
+use std::{env, thread::sleep};
 
 use chrono::NaiveDateTime;
 use dotenv::dotenv;
 use kordis::KordisToken;
 
-// TODO: add a CLI to allow the user to login using -u, --username, -p, --password
-// --start YYYY-MM-DD
-// --end YYYY-MM-DD
-// -w +|- <number> to move in the calendar on a week basis
+#[macro_use]
+extern crate log;
+
 #[tokio::main]
 async fn main() {
     dotenv().ok();
 
+    let cli_args = cli::Cli::parse();
+    println!("{:#?}", cli_args);
+
     let args: Vec<String> = env::args().collect();
+
+    env_logger::Builder::new()
+        .filter_level(cli_args.verbose.log_level_filter())
+        .init();
+
+    info!("starting up");
+
+    // let pb = indicatif::ProgressBar::new(100);
+    //
+    // for i in 0..3 {
+    //     sleep(tokio::time::Duration::from_millis(i));
+    //     pb.println(format!("[+] job #{}", i));
+    //     pb.inc(1);
+    // }
+    // pb.finish_with_message("done");
+
+    return;
 
     match args.get(1) {
         Some(arg_date) => {
