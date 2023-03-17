@@ -3,6 +3,9 @@ use regex::Regex;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 // use lazy_static::lazy_static;
 
 // This is the only way I have found to create a static vector of strings
@@ -47,49 +50,52 @@ impl KordisToken {
         }
     }
 
-    // TODO: extremely unsafe, take care of all of the unwraps
     pub async fn get_agenda(
         self: &Self,
         start: i64,
         end: i64,
-    ) -> Result<serde_json::Value, &'static str> {
+    ) -> Result<serde_json::Value> {
         match get_kordis_api_url("agenda", Some(true)) {
             Some(url) => {
                 let client: Client = reqwest::ClientBuilder::new().build().unwrap();
-                let authorization_header: String = format!("bearer {}", self.token);
+
+                let authorization_header: reqwest::header::HeaderValue = {
+                    let parsed_authorization_header = format!("bearer {}", self.token).parse();
+                    match parsed_authorization_header {
+                        Ok(value) => value,
+                        Err(e) => return Err(e.into()),
+                    }
+                };
 
                 let mut request_headers: header::HeaderMap = header::HeaderMap::new();
-                request_headers.insert(
-                    reqwest::header::AUTHORIZATION,
-                    authorization_header.parse().unwrap(),
-                );
+                request_headers.insert(reqwest::header::AUTHORIZATION, authorization_header);
 
-                println!("{:#?}", request_headers);
-                // TODO: take a week number, convert it to EPOCH time
                 let params = [("start", start.to_string()), ("end", end.to_string())];
+                let parsed_url = {
+                    let url = reqwest::Url::parse_with_params(&url, params);
+                    match url {
+                        Ok(value) => value,
+                        Err(e) => return Err(e.into()),
+                    }
+                };
 
-                let parsed_url = reqwest::Url::parse_with_params(&url, params).unwrap();
-
-                // FIXME: handle this response better, especially the unwrap
                 let response = client
                     .get(parsed_url)
                     .headers(request_headers)
                     .send()
-                    .await
-                    .unwrap()
+                    .await?
                     .json::<serde_json::Value>()
-                    .await
-                    .unwrap();
+                    .await?;
 
                 Ok(response)
             }
-            _ => Err("Could not get the agenda endpoint"),
+            _ => Err("Could not get the kordis API URL.".into()),
         }
     }
 
     // The way kordis authenticates its users is through the location header, it redirects the user
     // to a new path, inside of the value of the header we find all the data necessary to
-    pub fn from_location_header(location: &str) -> Result<KordisToken, &'static str> {
+    pub fn from_location_header(location: &str) -> Result<KordisToken> {
         // This regex matches this type of location header value:
         // access_token={imagine_that_there_is_a_real_token_here}&token_type=bearer&expires_in=604704&scope=account
         let location_re: Regex = Regex::new(r"(?:.*)#(([^=]*)=(.[^&]*)&?)*").unwrap();
@@ -103,26 +109,40 @@ impl KordisToken {
             // rust :)
             let mut map: HashMap<&str, &str> = HashMap::new();
 
+            // TODO: more descriptive error messages
             for group in kv_re.captures_iter(location) {
-                let key = group.get(2).unwrap().as_str();
-                let value = group.get(3).unwrap().as_str();
+                let key = {
+                    let maybe_val = group.get(2);
+                    match maybe_val {
+                        Some(val) => val,
+                        None => return Err("called `Option::unwrap()` on a `None` value".into()),
+                    }
+                }.as_str();
+
+                let value = {
+                    let maybe_val = group.get(3);
+                    match maybe_val {
+                        Some(val) => val,
+                        None => return Err("called `Option::unwrap()` on a `None` value".into()),
+                    }
+                }.as_str();
                 map.insert(key, value);
             }
 
             KordisToken::from_map(map)
         } else {
-            Err("The location header came in with an invalid format.")
+            Err("The location header came in with an invalid format.".into())
         }
     }
 
-    fn from_map(map: HashMap<&str, &str>) -> Result<KordisToken, &'static str> {
+    fn from_map(map: HashMap<&str, &str>) -> Result<KordisToken> {
         // TODO: only the access_token is considered as required right now, might change this later
         // When I have to play around with JWT tokens eventually
         let required_keys = ["access_token"];
 
         for key in required_keys {
             if !map.contains_key(key) {
-                return Err("The map doesn't contain the required keys");
+                return Err("The map doesn't contain the required keys".into());
             }
         }
 
@@ -152,10 +172,20 @@ impl KordisToken {
     }
 }
 
-pub async fn authenticate(username: &str, password: &str) -> Result<KordisToken, &'static str> {
+pub async fn authenticate(
+    username: &str,
+    password: &str,
+) -> Result<KordisToken> {
     let kordis_auth_url: String =
         std::env::var("KORDIS_AUTH_URL").expect("The KORDIS_AUTH_URL must be set.");
-    let authorization_header = format!("Basic {}", encoded_credentials(username, password));
+
+    let authorization_header: reqwest::header::HeaderValue = {
+        let parsed_authorization_header =  format!("Basic {}", encoded_credentials(username, password)).parse();
+        match parsed_authorization_header {
+            Ok(value) => value,
+            Err(e) => return Err(e.into()),
+        }
+    };
 
     // I could have used the reqwest::get() method directly but I may have to customize some
     // headers later on :/
@@ -164,16 +194,14 @@ pub async fn authenticate(username: &str, password: &str) -> Result<KordisToken,
     let mut request_headers: header::HeaderMap = header::HeaderMap::new();
     request_headers.insert(
         reqwest::header::AUTHORIZATION,
-        authorization_header.parse().unwrap(),
+        authorization_header
     );
 
-    // FIXME: handle this response better, especially the unwrap
     let response_headers = client
         .get(kordis_auth_url)
         .headers(request_headers)
         .send()
-        .await
-        .unwrap()
+        .await?
         .headers()
         .clone();
 
@@ -182,7 +210,7 @@ pub async fn authenticate(username: &str, password: &str) -> Result<KordisToken,
             let location_header: String = location.to_str().unwrap().to_string();
             KordisToken::from_location_header(&location_header)
         }
-        None => Err("Could not authenticate the user, please check your credentials and try again ! (if the problem persist feel free to create a GitHub Issue :P)"),
+        None => Err("Could not authenticate the user, please check your credentials and try again ! (if the problem persist feel free to create a GitHub Issue :P)".into())
     }
 }
 
