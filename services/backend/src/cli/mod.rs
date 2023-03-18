@@ -1,5 +1,13 @@
-use clap::{Parser, Args, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
+
+pub mod calendar;
+pub mod courses;
+pub mod login;
+
+use calendar::CalendarArgs;
+use courses::CoursesArgs;
+use login::LoginArgs;
 
 // TODO: maybe use the default attributes so that it gets filled using the Cargo.toml
 
@@ -23,19 +31,7 @@ Built with Rust and a few Clap .🚀"
 #[command(next_line_help = true)]
 pub struct Cli {
     #[command(subcommand)]
-    auth: AuthCommands,
-
-    /// 🚀 The start date for the mission! Format: YYYY-MM-DD
-    #[arg(short, long)]
-    start: Option<String>,
-
-    /// 🏁 The end date for the mission! Format: YYYY-MM-DD
-    #[arg(short, long)]
-    end: Option<String>,
-
-    /// 📅 The week number we're targeting!
-    #[arg(short, long)]
-    week: Option<u8>,
+    pub command: Command,
 
     /// 🐍 Output response as a raw JSON string
     #[arg(long)]
@@ -49,16 +45,13 @@ pub struct Cli {
 }
 
 #[derive(Debug, Subcommand)]
-enum AuthCommands {
-    /// 🌐 Authenticate the user to MyGES and retrieve its token
+pub enum Command {
+    ///// 🌐 Authenticate the user to MyGES and retrieve its token
     Login(LoginArgs),
     /// 🔑 Retrieves the authentication token if exists somewhere
-    Token
-}
-
-#[derive(Debug, Args)]
-struct LoginArgs {
-    username: String,
-    #[arg(long, short)]
-    password: Option<String>
+    Token,
+    /// 📅 commands related to the myges calendar
+    Calendar(CalendarArgs),
+    /// 📚 commands related to the myges calendar
+    Courses(CoursesArgs),
 }
