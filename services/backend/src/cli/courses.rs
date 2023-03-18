@@ -1,5 +1,4 @@
-use clap::{Args, Parser, Subcommand};
-use clap_verbosity_flag::{InfoLevel, Verbosity};
+use clap::Args;
 
 // TODO: WIP
 #[derive(Debug, Args)]

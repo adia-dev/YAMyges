@@ -50,11 +50,7 @@ impl KordisToken {
         }
     }
 
-    pub async fn get_agenda(
-        self: &Self,
-        start: i64,
-        end: i64,
-    ) -> Result<serde_json::Value> {
+    pub async fn get_agenda(self: &Self, start: i64, end: i64) -> Result<serde_json::Value> {
         match get_kordis_api_url("agenda", Some(true)) {
             Some(url) => {
                 let client: Client = reqwest::ClientBuilder::new().build().unwrap();
@@ -117,7 +113,8 @@ impl KordisToken {
                         Some(val) => val,
                         None => return Err("called `Option::unwrap()` on a `None` value".into()),
                     }
-                }.as_str();
+                }
+                .as_str();
 
                 let value = {
                     let maybe_val = group.get(3);
@@ -125,7 +122,8 @@ impl KordisToken {
                         Some(val) => val,
                         None => return Err("called `Option::unwrap()` on a `None` value".into()),
                     }
-                }.as_str();
+                }
+                .as_str();
                 map.insert(key, value);
             }
 
@@ -172,15 +170,13 @@ impl KordisToken {
     }
 }
 
-pub async fn authenticate(
-    username: &str,
-    password: &str,
-) -> Result<KordisToken> {
+pub async fn authenticate(username: &str, password: &str) -> Result<KordisToken> {
     let kordis_auth_url: String =
         std::env::var("KORDIS_AUTH_URL").expect("The KORDIS_AUTH_URL must be set.");
 
     let authorization_header: reqwest::header::HeaderValue = {
-        let parsed_authorization_header =  format!("Basic {}", encoded_credentials(username, password)).parse();
+        let parsed_authorization_header =
+            format!("Basic {}", encoded_credentials(username, password)).parse();
         match parsed_authorization_header {
             Ok(value) => value,
             Err(e) => return Err(e.into()),
@@ -192,10 +188,7 @@ pub async fn authenticate(
     let client: Client = reqwest::Client::builder().build().unwrap();
 
     let mut request_headers: header::HeaderMap = header::HeaderMap::new();
-    request_headers.insert(
-        reqwest::header::AUTHORIZATION,
-        authorization_header
-    );
+    request_headers.insert(reqwest::header::AUTHORIZATION, authorization_header);
 
     let response_headers = client
         .get(kordis_auth_url)

@@ -1,5 +1,5 @@
-use clap::{Args, Parser, Subcommand};
-use clap_verbosity_flag::{InfoLevel, Verbosity};
+use clap::Args;
+
 use once_cell::sync::OnceCell;
 
 pub static INSTANCE: OnceCell<&'static str> = OnceCell::new();

@@ -1,6 +1,4 @@
-use clap::{Args, Parser, Subcommand};
-use clap_verbosity_flag::{InfoLevel, Verbosity};
-
+use clap::Args;
 
 #[derive(Debug, Args)]
 pub struct LoginArgs {
@@ -9,5 +7,3 @@ pub struct LoginArgs {
     #[arg(long, short)]
     password: Option<String>,
 }
-
-

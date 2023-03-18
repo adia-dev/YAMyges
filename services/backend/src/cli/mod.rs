@@ -1,5 +1,5 @@
-use clap::{Args, Parser, Subcommand};
-use clap_verbosity_flag::{InfoLevel, Verbosity};
+use clap::{Parser, Subcommand};
+use clap_verbosity_flag::Verbosity;
 
 pub mod calendar;
 pub mod courses;

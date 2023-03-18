@@ -2,14 +2,12 @@ mod cli;
 mod kordis;
 
 use calendar::INSTANCE;
-use cli::{calendar, courses, login, Command};
+use cli::{calendar, Command};
 
 use clap::Parser;
-use std::{env, thread::sleep};
 
-use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, Utc};
+use chrono::{NaiveDate, NaiveDateTime, Utc};
 use dotenv::dotenv;
-use kordis::KordisToken;
 
 use lazy_static::lazy_static;
 
@@ -48,7 +46,7 @@ async fn main() -> Result<()> {
         Command::Calendar(calendar::CalendarArgs {
             start,
             end,
-            week,
+            week: _,
             format,
         }) => {
             // println!("Calendar: {:#?} {:#?} {:#?} {}", start, end, week, format);
