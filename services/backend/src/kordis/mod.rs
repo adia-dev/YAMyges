@@ -4,6 +4,8 @@ use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::models::agenda::AgendaResponse;
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 // use lazy_static::lazy_static;
@@ -50,7 +52,7 @@ impl KordisToken {
         }
     }
 
-    pub async fn get_agenda(self: &Self, start: i64, end: i64) -> Result<serde_json::Value> {
+    pub async fn get_agenda(self: &Self, start: i64, end: i64) -> Result<AgendaResponse> {
         match get_kordis_api_url("agenda", Some(true)) {
             Some(url) => {
                 let client: Client = reqwest::ClientBuilder::new().build().unwrap();
@@ -80,7 +82,7 @@ impl KordisToken {
                     .headers(request_headers)
                     .send()
                     .await?
-                    .json::<serde_json::Value>()
+                    .json::<AgendaResponse>()
                     .await?;
 
                 Ok(response)

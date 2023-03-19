@@ -1,2 +1,2 @@
-pub mod agenda_course;
+pub mod agenda;
 pub mod user;

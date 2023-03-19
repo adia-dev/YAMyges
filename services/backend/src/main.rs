@@ -1,5 +1,6 @@
 mod cli;
 mod kordis;
+mod models;
 
 use calendar::INSTANCE;
 use cli::{calendar, Command};
@@ -10,6 +11,8 @@ use chrono::{NaiveDate, NaiveDateTime, Utc};
 use dotenv::dotenv;
 
 use lazy_static::lazy_static;
+
+use crate::models::agenda::AgendaResponse;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -51,11 +54,24 @@ async fn main() -> Result<()> {
         }) => {
             // println!("Calendar: {:#?} {:#?} {:#?} {}", start, end, week, format);
 
-            let start_date_time = parse_arg_date(start, &format);
-            let end_date_time = parse_arg_date(end, &format);
+            let start_date_time = parse_arg_date(start, &format)?;
+            let end_date_time = parse_arg_date(end, &format)?;
 
-            println!("start: {:#?}", start_date_time);
-            println!("end: {:#?}", end_date_time);
+            println!("start: {:#?}", start_date_time.timestamp_millis());
+            println!("end: {:#?}", end_date_time.timestamp_millis());
+
+            let username = std::env::var("KORDIS_USERNAME").expect("KORDIS_USERNAME must be set.");
+            let password = std::env::var("KORDIS_PASSWORD").expect("KORDIS_USERNAME must be set.");
+            let token = kordis::authenticate(&username, &password).await?;
+
+            let agenda: AgendaResponse = token
+                .get_agenda(
+                    start_date_time.timestamp_millis(),
+                    end_date_time.timestamp_millis(),
+                )
+                .await?;
+
+            println!("{:#?}", agenda);
         }
         _ => (),
     };
