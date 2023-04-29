@@ -1,54 +1,86 @@
+mod cli;
 mod kordis;
+mod models;
 
-use std::env;
+use calendar::INSTANCE;
+use cli::{calendar, Command};
 
-use chrono::NaiveDateTime;
+use clap::Parser;
+
+use chrono::{NaiveDate, NaiveDateTime, Utc};
 use dotenv::dotenv;
-use kordis::KordisToken;
 
-// TODO: add a CLI to allow the user to login using -u, --username, -p, --password
-// --start YYYY-MM-DD
-// --end YYYY-MM-DD
-// -w +|- <number> to move in the calendar on a week basis
+use lazy_static::lazy_static;
+
+use crate::models::agenda::AgendaResponse;
+
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+#[macro_use]
+extern crate log;
+
+fn parse_arg_date(arg: Option<String>, fmt: &str) -> Result<NaiveDateTime> {
+    match arg {
+        Some(s) => match NaiveDate::parse_from_str(&s, fmt) {
+            Ok(date_time) => Ok(date_time.and_hms_opt(0, 0, 0).unwrap()),
+            Err(error) => Err(error.into()),
+        },
+        _ => Err("The argument for this date is apparently empty, please fill up one date.".into()),
+    }
+}
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     dotenv().ok();
 
-    let args: Vec<String> = env::args().collect();
+    lazy_static! {
+        static ref NOW: String = Utc::now().date_naive().to_string();
+    };
 
-    match args.get(1) {
-        Some(arg_date) => {
-            let arg_date_time: String = format!("{} 00:00:00", &arg_date);
-            println!("{arg_date_time}");
-            let parsed_date_time =
-                NaiveDateTime::parse_from_str(&arg_date_time, "%Y-%m-%d %H:%M:%S").unwrap();
+    INSTANCE.set(&NOW).unwrap();
 
-            let username: String =
-                std::env::var("KORDIS_USERNAME").expect("KORDIS_USERNAME must be set.");
+    let cli_args = cli::Cli::parse();
+    // println!("{:#?}", cli_args);
 
-            let password: String =
-                std::env::var("KORDIS_PASSWORD").expect("KORDIS_PASSWORD must be set.");
+    match cli_args.command {
+        Command::Token => {
+            println!("Here is your kordis token: gneugneugneu")
+        }
+        Command::Calendar(calendar::CalendarArgs {
+            start,
+            end,
+            week: _,
+            format,
+        }) => {
+            // println!("Calendar: {:#?} {:#?} {:#?} {}", start, end, week, format);
 
-            let token: KordisToken = match kordis::authenticate(&username, &password).await {
-                Ok(token) => token,
-                Err(error) => panic!("Could not authenticate {}, reason: {:?}", username, error),
-            };
+            let start_date_time = parse_arg_date(start, &format)?;
+            let end_date_time = parse_arg_date(end, &format)?;
 
-            let start: i64 = parsed_date_time.timestamp_millis();
-            let end: i64 = chrono::offset::Local::now()
-                .date_naive()
-                .and_hms_opt(0, 0, 0)
-                .unwrap()
-                .timestamp_millis();
+            println!("start: {:#?}", start_date_time.timestamp_millis());
+            println!("end: {:#?}", end_date_time.timestamp_millis());
 
-            println!("{:#?}", token);
+            let username = std::env::var("KORDIS_USERNAME").expect("KORDIS_USERNAME must be set.");
+            let password = std::env::var("KORDIS_PASSWORD").expect("KORDIS_USERNAME must be set.");
+            let token = kordis::authenticate(&username, &password).await?;
 
-            let agenda = token.get_agenda(start, end).await.unwrap();
+            let agenda: AgendaResponse = token
+                .get_agenda(
+                    start_date_time.timestamp_millis(),
+                    end_date_time.timestamp_millis(),
+                )
+                .await?;
 
             println!("{:#?}", agenda);
         }
-        None => {
-            println!("usage: {} YYYY-MM-DD", args.get(0).unwrap())
-        }
-    }
+        _ => (),
+    };
+
+    env_logger::Builder::new()
+        .filter_level(cli_args.verbose.log_level_filter())
+        .init();
+
+    info!("Debug Mode");
+
+    Ok(())
 }

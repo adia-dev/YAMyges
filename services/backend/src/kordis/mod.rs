@@ -4,6 +4,8 @@ use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::models::agenda::AgendaResponse;
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 // use lazy_static::lazy_static;
@@ -50,11 +52,7 @@ impl KordisToken {
         }
     }
 
-    pub async fn get_agenda(
-        self: &Self,
-        start: i64,
-        end: i64,
-    ) -> Result<serde_json::Value> {
+    pub async fn get_agenda(self: &Self, start: i64, end: i64) -> Result<AgendaResponse> {
         match get_kordis_api_url("agenda", Some(true)) {
             Some(url) => {
                 let client: Client = reqwest::ClientBuilder::new().build().unwrap();
@@ -84,7 +82,7 @@ impl KordisToken {
                     .headers(request_headers)
                     .send()
                     .await?
-                    .json::<serde_json::Value>()
+                    .json::<AgendaResponse>()
                     .await?;
 
                 Ok(response)
@@ -103,11 +101,12 @@ impl KordisToken {
         if location_re.is_match(location) {
             // regex to extract the key value pairs presents in the location header
             // FIXME: maybe there is a way of doing it in a single regex expression
+            // FIXME: the scope key is not being matched, I don't know why
             let kv_re: Regex = Regex::new(r"(?:(?:.*)#)?(([^=]*)=(.[^&]*)&?)").unwrap();
 
             // Using the HashMap was not really necessary I just wanted to try it, still learning
             // rust :)
-            let mut map: HashMap<&str, &str> = HashMap::new();
+            let mut map: HashMap<String, String> = HashMap::new();
 
             // TODO: more descriptive error messages
             for group in kv_re.captures_iter(location) {
@@ -117,7 +116,8 @@ impl KordisToken {
                         Some(val) => val,
                         None => return Err("called `Option::unwrap()` on a `None` value".into()),
                     }
-                }.as_str();
+                }
+                .as_str();
 
                 let value = {
                     let maybe_val = group.get(3);
@@ -125,8 +125,9 @@ impl KordisToken {
                         Some(val) => val,
                         None => return Err("called `Option::unwrap()` on a `None` value".into()),
                     }
-                }.as_str();
-                map.insert(key, value);
+                }
+                .as_str();
+                map.insert(key.to_string(), value.to_string());
             }
 
             KordisToken::from_map(map)
@@ -135,7 +136,7 @@ impl KordisToken {
         }
     }
 
-    fn from_map(map: HashMap<&str, &str>) -> Result<KordisToken> {
+    fn from_map(map: HashMap<String, String>) -> Result<KordisToken> {
         // TODO: only the access_token is considered as required right now, might change this later
         // When I have to play around with JWT tokens eventually
         let required_keys = ["access_token"];
@@ -154,9 +155,9 @@ impl KordisToken {
         let mut expires_in: Option<i64> = None;
 
         for (key, value) in map {
-            match key {
+            match key.as_str() {
                 "access_token" => token = value.to_string(),
-                "kind" => kind = Some(value.to_string()),
+                "token_type" => kind = Some(value.to_string()),
                 "scope" => scope = Some(value.to_string()),
                 "expires_in" => {
                     match value.parse::<i64>() {
@@ -172,15 +173,13 @@ impl KordisToken {
     }
 }
 
-pub async fn authenticate(
-    username: &str,
-    password: &str,
-) -> Result<KordisToken> {
+pub async fn authenticate(username: &str, password: &str) -> Result<KordisToken> {
     let kordis_auth_url: String =
         std::env::var("KORDIS_AUTH_URL").expect("The KORDIS_AUTH_URL must be set.");
 
     let authorization_header: reqwest::header::HeaderValue = {
-        let parsed_authorization_header =  format!("Basic {}", encoded_credentials(username, password)).parse();
+        let parsed_authorization_header =
+            format!("Basic {}", encoded_credentials(username, password)).parse();
         match parsed_authorization_header {
             Ok(value) => value,
             Err(e) => return Err(e.into()),
@@ -192,10 +191,7 @@ pub async fn authenticate(
     let client: Client = reqwest::Client::builder().build().unwrap();
 
     let mut request_headers: header::HeaderMap = header::HeaderMap::new();
-    request_headers.insert(
-        reqwest::header::AUTHORIZATION,
-        authorization_header
-    );
+    request_headers.insert(reqwest::header::AUTHORIZATION, authorization_header);
 
     let response_headers = client
         .get(kordis_auth_url)
@@ -272,9 +268,73 @@ fn get_kordis_api_url(endpoint: &str, me: Option<bool>) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
+    use super::*;
+
     #[test]
     fn whats_nine_plus_ten() {
         let result = 9 + 10;
         assert_ne!(result, 21); // you stupid !
+    }
+
+    #[test]
+    fn should_successfully_create_a_token_from_a_map() {
+        let mut map: HashMap<String, String> = HashMap::new();
+
+        map.insert("access_token".to_string(), "token".to_string());
+        map.insert("token_type".to_string(), "type".to_string());
+        map.insert("expires_in".to_string(), "0".to_string());
+        map.insert("scope".to_string(), "scope".to_string());
+
+        let token: Result<KordisToken> = KordisToken::from_map(map);
+
+        assert!(token.is_ok());
+
+        let token: KordisToken = token.unwrap();
+
+        assert_eq!(token.token, "token");
+        assert_eq!(token.kind, Some("type".to_string()));
+        assert_eq!(token.expiration, Some(0));
+        assert_eq!(token.scope, Some("scope".to_string()));
+    }
+
+    #[test]
+    fn sould_successfully_parse_a_location_header_into_a_kordis_token() {
+        let location_header: String = String::from("notworthyofattention:/notworthyofattention#access_token=token&token_type=type&expires_in=0&scopescope");
+
+        let parsed_token = KordisToken::from_location_header(&location_header);
+
+        assert!(parsed_token.is_ok());
+
+        let token: KordisToken = parsed_token.unwrap();
+
+        assert_eq!(token.token, "token");
+        assert_eq!(token.kind, Some("type".to_string()));
+        // FIXME: the expiration is never parsed for now so it's always None
+        assert_eq!(token.expiration, Some(0));
+        assert_eq!(token.scope, None);
+    }
+
+    #[test]
+    fn should_generate_the_correct_value_for_the_encoded_credentials() {
+        let username: String = String::from("username");
+        let password: String = String::from("password");
+
+        let encoded_credentials = encoded_credentials(&username, &password);
+
+        assert_eq!(encoded_credentials, "dXNlcm5hbWU6cGFzc3dvcmQ")
+    }
+
+    #[test]
+    fn each_endpoint_should_have_a_corresponding_path() {
+        let endpoints: Vec<&str> = vec![
+            "profile", "agenda", "news", "banners", "grades", "absences", "classes", "students",
+            "student",
+        ];
+
+        for endpoint in endpoints {
+            let endpoint_path = get_endpoint(endpoint);
+            assert!(endpoint_path.is_some());
+        }
     }
 }
